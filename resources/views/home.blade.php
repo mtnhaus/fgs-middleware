@@ -4,7 +4,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="robots" content="noindex">
-        <title>FGS App</title>
+        <title>Flighting Golf Society App</title>
 
         <style>
             main {
@@ -16,7 +16,7 @@
     </head>
     <body>
         <main>
-            <p>FGS App v1.0</p>
+            <p>Flighting Golf Society App v1.0</p>
         </main>
     </body>
 </html>

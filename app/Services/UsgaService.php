@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Log;
 
 class UsgaService
 {
+    private const RETRY_ATTEMPTS = 3;
+    private const RETRY_DELAY_MS = 250;
+
     private const TOKEN_CACHE_KEY = 'usga_token';
     private const TOKEN_HOURS_TTL = 12;
 
@@ -25,15 +28,24 @@ class UsgaService
             return Cache::get(self::TOKEN_CACHE_KEY);
         }
 
-        $response = Http::post(config('usga.api.base_url') . '/users/login.json', [
+        $request = Http::createPendingRequest();
+
+        $request->retry(self::RETRY_ATTEMPTS, self::RETRY_DELAY_MS, throw: false);
+
+        $response = $request->post(config('usga.api.base_url') . '/users/login.json', [
             'user' => [
                 'email' => config('usga.api.user.email'),
                 'password' => config('usga.api.user.password'),
                 'remember_me' => true,
-            ]
+            ],
         ]);
 
         if (!$response->ok()) {
+            Log::channel('usga')->error('Failed to authenticate', [
+                'code' => $response->status(),
+                'response' => $response->body(),
+            ]);
+
             $response->throw();
         }
 
@@ -56,14 +68,16 @@ class UsgaService
             return Cache::get(self::GOLFERS_CACHE_KEY . $idsKey);
         }
 
-        $response = Http::withToken($this->authenticate())->get(
-            config('usga.api.base_url') . '/golfers/search.json',
-            [
-                'per_page' => count($ids),
-                'page' => 1,
-                'golfer_id' => implode(',', $ids),
-            ]
-        );
+        $request = Http::createPendingRequest();
+
+        $request->retry(self::RETRY_ATTEMPTS, self::RETRY_DELAY_MS, throw: false);
+        $request->withToken($this->authenticate());
+
+        $response = $request->get(config('usga.api.base_url') . '/golfers/search.json', [
+            'per_page' => count($ids),
+            'page' => 1,
+            'golfer_id' => implode(',', $ids),
+        ]);
 
         if (!$response->ok()) {
             Log::channel('usga')->error('Failed to fetch golfers', [

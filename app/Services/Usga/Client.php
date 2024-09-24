@@ -72,7 +72,7 @@ class Client
             return null;
         }
 
-        $golfer = Arr::only($golfers[0], ['first_name', 'last_name', 'email', 'state', 'handicap_index']);
+        $golfer = Arr::only($golfers[0], ['first_name', 'last_name', 'email', 'handicap_index']);
 
         Cache::put(self::GOLFER_CACHE_KEY . $id, $golfer, now()->addHours(self::GOLFER_HOURS_TTL));
 

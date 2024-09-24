@@ -4,19 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\GetGolferRequest;
 use App\Services\Usga\Client;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 
 class GolfersController extends Controller
 {
-    public function get(Client $usga, int $id): JsonResponse
+    public function get(GetGolferRequest $request, Client $usga, int $id): JsonResponse
     {
-        $params = request()->validate([
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
-        ]);
-
         try {
             $golfer = $usga->getGolfer($id);
         } catch (\Throwable $e) {
@@ -29,8 +25,8 @@ class GolfersController extends Controller
         }
 
         if (
-            strcasecmp($params['first_name'], $golfer['first_name']) !== 0
-            || strcasecmp($params['last_name'], $golfer['last_name']) !== 0
+            strcasecmp($request->validated('first_name'), $golfer['first_name']) !== 0
+            || strcasecmp($request->validated('last_name'), $golfer['last_name']) !== 0
         ) {
             return response()->json(['message' => 'Bad Request'], 400);
         }

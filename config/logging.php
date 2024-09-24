@@ -58,6 +58,24 @@ return [
             'ignore_exceptions' => false,
         ],
 
+        'usga' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/usga.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+            'ignore_exceptions' => false,
+        ],
+
+        'shopify' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/shopify.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+            'ignore_exceptions' => false,
+        ],
+
         'single' => [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),

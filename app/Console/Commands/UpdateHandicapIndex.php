@@ -32,8 +32,8 @@ class UpdateHandicapIndex extends Command implements Isolatable
 
             $this->line(sprintf('Processing batch of %d customers...', count($customers)));
 
-            $customers = Arr::where($customers, fn($customer) => Arr::has($customer, 'golfer_id.value'));
-            $golferIds = Arr::pluck($customers, 'golfer_id.value');
+            $customers = Arr::where($customers, fn($customer) => Arr::has($customer, 'ghin_number.value'));
+            $golferIds = Arr::pluck($customers, 'ghin_number.value');
 
             try {
                 $golfers = $this->usga->getGolfers($golferIds);

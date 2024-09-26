@@ -16,9 +16,9 @@ class Customers
                 edges {
                     node {
                         id
-                        golfer_id: metafield(
+                        ghin_number: metafield(
                             namespace: "customer"
-                            key: "golfer_id"
+                            key: "ghin_number"
                         ) {
                             id
                             value

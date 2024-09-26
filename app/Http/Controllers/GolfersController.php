@@ -5,18 +5,19 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Http\Requests\GetGolferRequest;
-use App\Services\Usga\Client;
+use App\Services\UsgaService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 class GolfersController extends Controller
 {
-    public function get(GetGolferRequest $request, Client $usga, int $id): JsonResponse
+    public function get(GetGolferRequest $request, UsgaService $usga, int $id): JsonResponse
     {
         try {
-            $golfer = $usga->getGolfer($id);
+            $golfer = Arr::first($usga->getGolfers([$id]));
         } catch (\Throwable $e) {
-            Log::error('Error fetching golfer from USGA API', ['exception' => $e]);
+            Log::channel('usga')->error("Failed to fetch golfer with ID {$id}.", ['exception' => $e]);
             return response()->json(['message' => 'Unexpected Error'], 500);
         }
 
@@ -31,6 +32,6 @@ class GolfersController extends Controller
             return response()->json(['message' => 'Bad Request'], 400);
         }
 
-        return response()->json($golfer);
+        return response()->json(Arr::only($golfer, ['first_name', 'last_name', 'email', 'handicap_index']));
     }
 }

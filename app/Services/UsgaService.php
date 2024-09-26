@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Usga;
+namespace App\Services;
 
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
-class Client
+class UsgaService
 {
     private const TOKEN_CACHE_KEY = 'usga_token';
     private const TOKEN_HOURS_TTL = 12;
 
-    private const GOLFER_CACHE_KEY = 'usga_golfer_';
-    private const GOLFER_HOURS_TTL = 1;
+    private const GOLFERS_CACHE_KEY = 'usga_golfers_';
+    private const GOLFERS_HOURS_TTL = 1;
 
     /**
      * @link https://app.swaggerhub.com/apis-docs/GHIN/GHIN2020AllSandbox/1.0#/User%20APIs/post_users_login__format_ Swagger
@@ -47,35 +47,38 @@ class Client
     /**
      * @link https://app.swaggerhub.com/apis-docs/GHIN/GHIN2020AllSandbox/1.0#/Golfer%20APIs/get_golfers_search__format_ Swagger
      */
-    public function getGolfer(int $id): ?array
+    public function getGolfers(array $ids): ?array
     {
-        if (Cache::has(self::GOLFER_CACHE_KEY . $id)) {
-            return Cache::get(self::GOLFER_CACHE_KEY . $id);
+        sort($ids, SORT_NUMERIC);
+        $idsKey = md5(implode('_', $ids));
+
+        if (Cache::has(self::GOLFERS_CACHE_KEY . $idsKey)) {
+            return Cache::get(self::GOLFERS_CACHE_KEY . $idsKey);
         }
 
         $response = Http::withToken($this->authenticate())->get(
             config('usga.api.base_url') . '/golfers/search.json',
             [
-                'per_page' => 1,
+                'per_page' => count($ids),
                 'page' => 1,
-                'golfer_id' => $id,
+                'golfer_id' => implode(',', $ids),
             ]
         );
 
         if (!$response->ok()) {
+            Log::channel('usga')->error('Failed to fetch golfers', [
+                'code' => $response->status(),
+                'response' => $response->body(),
+                'golfer_ids' => $ids,
+            ]);
+
             $response->throw();
         }
 
-        $golfers = $response->json('golfers');
+        $golfers = $response->json('golfers', []);
 
-        if (!isset($golfers[0])) {
-            return null;
-        }
+        Cache::put(self::GOLFERS_CACHE_KEY . $idsKey, $golfers, now()->addHours(self::GOLFERS_HOURS_TTL));
 
-        $golfer = Arr::only($golfers[0], ['first_name', 'last_name', 'email', 'handicap_index']);
-
-        Cache::put(self::GOLFER_CACHE_KEY . $id, $golfer, now()->addHours(self::GOLFER_HOURS_TTL));
-
-        return $golfer;
+        return $golfers;
     }
 }

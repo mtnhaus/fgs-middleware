@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Components\Shopify\Mutation;
+namespace App\Components\Shopify\Mutation\Admin;
 
 class CustomerUpdate
 {

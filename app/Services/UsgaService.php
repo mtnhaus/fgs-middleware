@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\Tier;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -89,10 +91,30 @@ class UsgaService
             $response->throw();
         }
 
-        $golfers = $response->json('golfers', []);
+        $golfers = Arr::map(
+            $response->json('golfers', []),
+            function ($golfer) {
+                $tier = $this->qualify(Arr::get($golfer, 'handicap_index'));
+                Arr::set($golfer, 'tier', $tier);
+
+                return $golfer;
+            }
+        );
 
         Cache::put(self::GOLFERS_CACHE_KEY . $idsKey, $golfers, now()->addHours(self::GOLFERS_HOURS_TTL));
 
         return $golfers;
+    }
+
+    public function qualify(string $handicapIndex): string
+    {
+        return match (true) {
+            str_starts_with($handicapIndex, '+') => Tier::FT_PLUS->value,
+            (float) $handicapIndex >= 0 && (float) $handicapIndex < 5 => Tier::FT1->value,
+            (float) $handicapIndex >= 5 && (float) $handicapIndex < 10 => Tier::FT2->value,
+            (float) $handicapIndex >= 10 && (float) $handicapIndex < 15 => Tier::FT3->value,
+            (float) $handicapIndex >= 15 && (float) $handicapIndex < 20 => Tier::FT4->value,
+            default => Tier::UNDEFINED->value,
+        };
     }
 }

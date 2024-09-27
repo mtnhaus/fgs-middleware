@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace App\Components\Shopify;
+namespace App\Components\Shopify\Client;
 
 use App\Components\Shopify\DTO\Cost;
 use Exception;
 use Illuminate\Support\Facades\Redis;
-use Shopify\Clients\Graphql;
+use Shopify\Clients\Graphql as OriginalGraphqlClient;
 use Shopify\Clients\HttpResponse;
 use Shopify\Exception\HttpRequestException;
 use Shopify\Exception\MissingArgumentException;
 
-class GraphqlClient extends Graphql
+class Graphql extends OriginalGraphqlClient
 {
     private const TIMEOUT_PREFIX = 'shopify_graphql_timeout_';
     private const MAX_DELAY = 1000;
@@ -56,7 +56,7 @@ class GraphqlClient extends Graphql
             if ($tries) {
                 return $this->query($data, $query, $extraHeaders, $tries - 1);
             } else {
-                throw new Exception($statusCode . ' Shopify Request Error: ' . print_r($data, 1));
+                throw new Exception($statusCode . ' Shopify Request Error');
             }
         }
 
@@ -66,14 +66,16 @@ class GraphqlClient extends Graphql
 
         $msDelay = $this->calculateDelay($cost);
 
-        if ($msDelay === null) {
-            throw new Exception('Shopify Response Error: ' . print_r($body, 1));
-        } else {
+        if ($msDelay !== null) {
             Redis::set($this->timeoutKey(), '1', 'PX', $msDelay ?: self::MAX_DELAY);
         }
 
-        if ($errors && $tries) {
-            return $this->query($data, $query, $extraHeaders, $tries - 1);
+        if ($errors) {
+            if ($tries) {
+                return $this->query($data, $query, $extraHeaders, $tries - 1);
+            }
+
+            throw new Exception('Shopify Response Error: ' . json_encode($errors));
         }
 
         return $response;

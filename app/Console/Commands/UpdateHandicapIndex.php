@@ -46,13 +46,13 @@ class UpdateHandicapIndex extends Command implements Isolatable
                 continue;
             }
 
-            $handicapIndexes = Arr::mapWithKeys(
+            $golfers = Arr::mapWithKeys(
                 $golfers,
-                fn($golfer) => [Arr::get($golfer, 'ghin') => Arr::get($golfer, 'handicap_index')]
+                fn($golfer) => [Arr::get($golfer, 'ghin') => $golfer]
             );
 
             foreach ($customers as $customer) {
-                $this->updateCustomer($customer, $handicapIndexes);
+                $this->updateCustomer($customer, $golfers);
             }
         } while ($hasNextPage);
 
@@ -60,30 +60,50 @@ class UpdateHandicapIndex extends Command implements Isolatable
         $this->info('Done');
     }
 
-    private function updateCustomer(array $customer, array &$handicapIndexes): void
+    private function updateCustomer(array $customer, array &$golfers): void
     {
-        $golferId = Arr::get($customer, 'golfer_id.value');
+        $golferId = Arr::get($customer, 'ghin_number.value');
         $handicapIndex = Arr::get($customer, 'handicap_index.value', '');
-        $newHandicapIndex = Arr::get($handicapIndexes, $golferId);
+        $golfer = Arr::get($golfers, $golferId);
+        $newHandicapIndex = Arr::get($golfer, 'handicap_index', '');
+        $newTier = Arr::get($golfer, 'tier', '');
 
         if ($handicapIndex && $handicapIndex === $newHandicapIndex) {
             return;
         }
 
-        $metafield = [
+        $handicapIndexMetafield = [
             'namespace' => 'customer',
             'key' => 'handicap_index',
             'value' => $newHandicapIndex,
         ];
 
-        $metafieldId = Arr::get($customer, 'handicap_index.id');
+        $handicapIndexMetafieldId = Arr::get($customer, 'handicap_index.id');
 
-        if ($metafieldId) {
-            Arr::set($metafield, 'id', $metafieldId);
+        if ($handicapIndexMetafieldId) {
+            Arr::set($handicapIndexMetafield, 'id', $handicapIndexMetafieldId);
+        }
+
+        $tierMetafield = [
+            'namespace' => 'customer',
+            'key' => 'tier',
+            'value' => $newTier,
+        ];
+
+        $tierMetafieldId = Arr::get($customer, 'tier.id');
+
+        if ($tierMetafieldId) {
+            Arr::set($tierMetafield, 'id', $tierMetafieldId);
         }
 
         try {
-            $this->shopify->updateCustomer(['id' => Arr::get($customer, 'id'), 'metafields' => [$metafield]]);
+            $this->shopify->updateCustomer([
+                'id' => Arr::get($customer, 'id'),
+                'metafields' => [
+                    $handicapIndexMetafield,
+                    $tierMetafield,
+                ],
+            ]);
         } catch (\Throwable) {
             // Just continue processing. Error logged elsewhere.
         }

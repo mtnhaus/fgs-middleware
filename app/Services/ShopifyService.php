@@ -4,30 +4,32 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Components\Shopify\GraphqlClient;
-use App\Components\Shopify\Mutation\CustomerUpdate;
-use App\Components\Shopify\Query\Customers;
-use App\Services\Shopify\Query;
+use App\Components\Shopify\Client\Graphql;
+use App\Components\Shopify\Client\Storefront;
+use App\Components\Shopify\Mutation\Admin\CustomerUpdate;
+use App\Components\Shopify\Mutation\Storefront\CustomerCreate;
+use App\Components\Shopify\Query\Admin\Customers;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 class ShopifyService
 {
-    public function __construct(private GraphqlClient $client)
-    {
+    public function __construct(
+        private Graphql $adminClient,
+        private Storefront $storefrontClient
+    ) {
     }
 
     public function getCustomers(int $pageSize = 50, ?string $endCursor = null): array
     {
-        $response = $this->client->query(Customers::build($pageSize, $endCursor));
-
-        if ($response->getStatusCode() !== 200) {
+        try {
+            $response = $this->adminClient->query(Customers::build($pageSize, $endCursor));
+        } catch (\Exception $e) {
             Log::channel('shopify')->error('Failed to fetch customers from Shopify.', [
-                'code' => $response->getStatusCode(),
-                'response' => $response->getBody()->getContents(),
+                'message' => $e->getMessage(),
             ]);
 
-            throw new \RuntimeException('Failed to fetch customers from Shopify.');
+            throw $e;
         }
 
         $data = $response->getDecodedBody();
@@ -39,17 +41,65 @@ class ShopifyService
         return [$hasNextPage, $endCursor, $customers];
     }
 
-    public function updateCustomer(array $input): void
+    public function createCustomer(array $data): string
     {
-        $response = $this->client->query(CustomerUpdate::build($input));
+        $input = [
+            'firstName' => Arr::get($data, 'first_name'),
+            'lastName' => Arr::get($data, 'last_name'),
+            'email' => Arr::get($data, 'email'),
+            'password' => Arr::get($data, 'password'),
+        ];
 
-        if ($response->getStatusCode() !== 200) {
-            Log::channel('shopify')->error('Failed to update customer in Shopify.', [
-                'code' => $response->getStatusCode(),
-                'response' => $response->getBody()->getContents(),
+        try {
+            $response = $this->storefrontClient->query(CustomerCreate::build($input));
+        } catch (\Exception $e) {
+            Log::channel('shopify')->error('Failed to create customer in Shopify.', [
+                'input' => Arr::except($input, 'password'),
+                'message' => $e->getMessage(),
             ]);
 
-            throw new \RuntimeException('Failed to update customer in Shopify.');
+            throw $e;
+        }
+
+        $customerId = (string) Arr::get($response->getDecodedBody(), 'data.customerCreate.customer.id');
+
+        $input = [
+            'id' => $customerId,
+            'metafields' => [
+                [
+                    'namespace' => 'customer',
+                    'key' => 'ghin_number',
+                    'value' => (string) Arr::get($data, 'ghin_number', ''),
+                ],
+                [
+                    'namespace' => 'customer',
+                    'key' => 'handicap_index',
+                    'value' => Arr::get($data, 'handicap_index', ''),
+                ],
+                [
+                    'namespace' => 'customer',
+                    'key' => 'tier',
+                    'value' => Arr::get($data, 'tier', ''),
+                ]
+            ],
+        ];
+
+        $this->updateCustomer($input);
+
+        return $customerId;
+    }
+
+    public function updateCustomer(array $input): void
+    {
+        try {
+            $this->adminClient->query(CustomerUpdate::build($input));
+        } catch (\Exception $e) {
+            Log::channel('shopify')->error('Failed to update customer in Shopify.', [
+                'input' => $input,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw $e;
         }
     }
 }

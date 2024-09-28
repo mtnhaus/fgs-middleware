@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Components\Shopify\Query;
+namespace App\Components\Shopify\Query\Admin;
 
 class Customers
 {
@@ -16,9 +16,9 @@ class Customers
                 edges {
                     node {
                         id
-                        golfer_id: metafield(
+                        ghin_number: metafield(
                             namespace: "customer"
-                            key: "golfer_id"
+                            key: "ghin_number"
                         ) {
                             id
                             value
@@ -26,6 +26,13 @@ class Customers
                         handicap_index: metafield(
                             namespace: "customer"
                             key: "handicap_index"
+                        ) {
+                            id
+                            value
+                        },
+                        tier: metafield(
+                            namespace: "customer"
+                            key: "tier"
                         ) {
                             id
                             value

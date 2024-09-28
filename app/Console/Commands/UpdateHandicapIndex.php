@@ -7,6 +7,7 @@ use App\Services\UsgaService;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Console\Isolatable;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 
 class UpdateHandicapIndex extends Command implements Isolatable
 {
@@ -21,6 +22,8 @@ class UpdateHandicapIndex extends Command implements Isolatable
 
     public function handle()
     {
+        $startedAt = microtime(true);
+
         $this->info('Updating handicap index');
         $this->newLine();
 
@@ -32,8 +35,8 @@ class UpdateHandicapIndex extends Command implements Isolatable
 
             $this->line(sprintf('Processing batch of %d customers...', count($customers)));
 
-            $customers = Arr::where($customers, fn($customer) => Arr::has($customer, 'golfer_id.value'));
-            $golferIds = Arr::pluck($customers, 'golfer_id.value');
+            $customers = Arr::where($customers, fn($customer) => Arr::has($customer, 'ghin_number.value'));
+            $golferIds = Arr::pluck($customers, 'ghin_number.value');
 
             try {
                 $golfers = $this->usga->getGolfers($golferIds);
@@ -46,44 +49,42 @@ class UpdateHandicapIndex extends Command implements Isolatable
                 continue;
             }
 
-            $handicapIndexes = Arr::mapWithKeys(
+            $golfers = Arr::mapWithKeys(
                 $golfers,
-                fn($golfer) => [Arr::get($golfer, 'ghin') => Arr::get($golfer, 'handicap_index')]
+                fn($golfer) => [Arr::get($golfer, 'ghin') => $golfer]
             );
 
             foreach ($customers as $customer) {
-                $this->updateCustomer($customer, $handicapIndexes);
+                $this->updateCustomer($customer, $golfers);
             }
         } while ($hasNextPage);
 
         $this->newLine();
         $this->info('Done');
+
+        $finishedAt = microtime(true);
+        $processTime = number_format($finishedAt - $startedAt, 2);
+
+        Log::info('Handicap Index Update completed in ' . $processTime . ' seconds');
     }
 
-    private function updateCustomer(array $customer, array &$handicapIndexes): void
+    private function updateCustomer(array $customer, array &$golfers): void
     {
-        $golferId = Arr::get($customer, 'golfer_id.value');
+        $golferId = Arr::get($customer, 'ghin_number.value');
         $handicapIndex = Arr::get($customer, 'handicap_index.value', '');
-        $newHandicapIndex = Arr::get($handicapIndexes, $golferId);
+        $golfer = Arr::get($golfers, $golferId);
+        $newHandicapIndex = Arr::get($golfer, 'handicap_index', '');
+        $newTier = Arr::get($golfer, 'tier', '');
 
         if ($handicapIndex && $handicapIndex === $newHandicapIndex) {
             return;
         }
 
-        $metafield = [
-            'namespace' => 'customer',
-            'key' => 'handicap_index',
-            'value' => $newHandicapIndex,
-        ];
-
-        $metafieldId = Arr::get($customer, 'handicap_index.id');
-
-        if ($metafieldId) {
-            Arr::set($metafield, 'id', $metafieldId);
-        }
-
         try {
-            $this->shopify->updateCustomer(['id' => Arr::get($customer, 'id'), 'metafields' => [$metafield]]);
+            $this->shopify->updateCustomer(
+                customer: $customer,
+                metafields: ['handicap_index' => $newHandicapIndex, 'tier' => $newTier]
+            );
         } catch (\Throwable) {
             // Just continue processing. Error logged elsewhere.
         }

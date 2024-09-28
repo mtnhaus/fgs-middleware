@@ -6,7 +6,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class GetGolferRequest extends FormRequest
+class VerifyCustomerRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -16,7 +16,7 @@ class GetGolferRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'first_name' => ['required', 'string', 'max:255'],
+            'ghin_number' => ['required', 'integer'],
             'last_name' => ['required', 'string', 'max:255'],
         ];
     }

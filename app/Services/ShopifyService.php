@@ -4,30 +4,29 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Components\Shopify\GraphqlClient;
-use App\Components\Shopify\Mutation\CustomerUpdate;
-use App\Components\Shopify\Query\Customers;
-use App\Services\Shopify\Query;
+use App\Components\Shopify\Client\Graphql;
+use App\Components\Shopify\Client\Storefront;
+use App\Components\Shopify\Mutation\Admin\CustomerUpdate;
+use App\Components\Shopify\Mutation\Storefront\CustomerCreate;
+use App\Components\Shopify\Query\Admin\Customer;
+use App\Components\Shopify\Query\Admin\Customers;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 class ShopifyService
 {
-    public function __construct(private GraphqlClient $client)
-    {
-    }
+    public function __construct(private Graphql $adminClient) {}
 
     public function getCustomers(int $pageSize = 50, ?string $endCursor = null): array
     {
-        $response = $this->client->query(Customers::build($pageSize, $endCursor));
-
-        if ($response->getStatusCode() !== 200) {
+        try {
+            $response = $this->adminClient->query(Customers::build($pageSize, $endCursor));
+        } catch (\Exception $e) {
             Log::channel('shopify')->error('Failed to fetch customers from Shopify.', [
-                'code' => $response->getStatusCode(),
-                'response' => $response->getBody()->getContents(),
+                'message' => $e->getMessage(),
             ]);
 
-            throw new \RuntimeException('Failed to fetch customers from Shopify.');
+            throw $e;
         }
 
         $data = $response->getDecodedBody();
@@ -39,17 +38,60 @@ class ShopifyService
         return [$hasNextPage, $endCursor, $customers];
     }
 
-    public function updateCustomer(array $input): void
+    public function getCustomer(string $id): array
     {
-        $response = $this->client->query(CustomerUpdate::build($input));
-
-        if ($response->getStatusCode() !== 200) {
-            Log::channel('shopify')->error('Failed to update customer in Shopify.', [
-                'code' => $response->getStatusCode(),
-                'response' => $response->getBody()->getContents(),
+        try {
+            $response = $this->adminClient->query(Customer::build($id));
+        } catch (\Exception $e) {
+            Log::channel('shopify')->error('Failed to fetch customer from Shopify.', [
+                'message' => $e->getMessage(),
             ]);
 
-            throw new \RuntimeException('Failed to update customer in Shopify.');
+            throw $e;
+        }
+
+        return Arr::get($response->getDecodedBody(), 'data.customer');
+    }
+
+    public function updateCustomer(array $customer, array $data = [], array $metafields = []): void
+    {
+        $input = [
+            'id' => Arr::get($customer, 'id'),
+        ];
+
+        $input = array_merge($data, $input);
+
+        if ($metafields) {
+            $input['metafields'] = [];
+
+            foreach ($metafields as $key => $value) {
+                $value = (string) $value;
+                $id = Arr::get($customer, "{$key}.id");
+
+                if ($id) {
+                    $input['metafields'][] = [
+                        'id' => $id,
+                        'value' => $value,
+                    ];
+                } else {
+                    $input['metafields'][] = [
+                        'namespace' => 'customer',
+                        'key' => $key,
+                        'value' => $value,
+                    ];
+                }
+            }
+        }
+
+        try {
+            $this->adminClient->query(CustomerUpdate::build($input));
+        } catch (\Exception $e) {
+            Log::channel('shopify')->error('Failed to update customer in Shopify.', [
+                'input' => $input,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw $e;
         }
     }
 }

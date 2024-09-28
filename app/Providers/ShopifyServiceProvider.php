@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Components\Shopify\GraphqlClient;
+use App\Components\Shopify\Client\Graphql;
 use App\Services\ShopifyService;
 use Illuminate\Support\ServiceProvider;
 use Shopify\Auth\FileSessionStorage;
@@ -25,13 +25,13 @@ class ShopifyServiceProvider extends ServiceProvider
             true
         );
 
-        $this->app->singleton(GraphqlClient::class, fn() => new GraphqlClient(
+        $this->app->singleton(Graphql::class, fn() => new Graphql(
             config('shopify.domain'),
             config('shopify.api.access_token')
         ));
 
         $this->app->singleton(ShopifyService::class, fn() => new ShopifyService(
-            app(GraphqlClient::class)
+            app(Graphql::class)
         ));
     }
 }

@@ -8,7 +8,7 @@ use App\Enums\Tier;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class CreateCustomerRequest extends FormRequest
+class UpdateCustomerRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -18,12 +18,9 @@ class CreateCustomerRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email:rfc,dns'],
-            'password' => ['required', 'required', 'string', 'min:5', 'max:40'],
+            'id' => ['required', 'string', 'regex:/^gid:\/\/shopify\/Customer\/\d+$/'],
             'ghin_number' => ['required', 'integer'],
-            'handicap_index' => ['required', 'regex:/^\+?\d+\.\d+$/'],
+            'handicap_index' => ['required', 'string', 'regex:/^\+?\d+\.\d+$/'],
             'tier' => ['required', Rule::enum(Tier::class)],
         ];
     }

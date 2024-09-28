@@ -7,6 +7,7 @@ use App\Services\UsgaService;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Console\Isolatable;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 
 class UpdateHandicapIndex extends Command implements Isolatable
 {
@@ -21,6 +22,8 @@ class UpdateHandicapIndex extends Command implements Isolatable
 
     public function handle()
     {
+        $startedAt = microtime(true);
+
         $this->info('Updating handicap index');
         $this->newLine();
 
@@ -58,6 +61,11 @@ class UpdateHandicapIndex extends Command implements Isolatable
 
         $this->newLine();
         $this->info('Done');
+
+        $finishedAt = microtime(true);
+        $processTime = number_format($finishedAt - $startedAt, 2);
+
+        Log::info('Handicap Index Update completed in ' . $processTime . ' seconds');
     }
 
     private function updateCustomer(array $customer, array &$golfers): void
@@ -72,38 +80,11 @@ class UpdateHandicapIndex extends Command implements Isolatable
             return;
         }
 
-        $handicapIndexMetafield = [
-            'namespace' => 'customer',
-            'key' => 'handicap_index',
-            'value' => $newHandicapIndex,
-        ];
-
-        $handicapIndexMetafieldId = Arr::get($customer, 'handicap_index.id');
-
-        if ($handicapIndexMetafieldId) {
-            Arr::set($handicapIndexMetafield, 'id', $handicapIndexMetafieldId);
-        }
-
-        $tierMetafield = [
-            'namespace' => 'customer',
-            'key' => 'tier',
-            'value' => $newTier,
-        ];
-
-        $tierMetafieldId = Arr::get($customer, 'tier.id');
-
-        if ($tierMetafieldId) {
-            Arr::set($tierMetafield, 'id', $tierMetafieldId);
-        }
-
         try {
-            $this->shopify->updateCustomer([
-                'id' => Arr::get($customer, 'id'),
-                'metafields' => [
-                    $handicapIndexMetafield,
-                    $tierMetafield,
-                ],
-            ]);
+            $this->shopify->updateCustomer(
+                customer: $customer,
+                metafields: ['handicap_index' => $newHandicapIndex, 'tier' => $newTier]
+            );
         } catch (\Throwable) {
             // Just continue processing. Error logged elsewhere.
         }

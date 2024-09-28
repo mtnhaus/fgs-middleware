@@ -7,6 +7,6 @@ use App\Http\Middleware\VerifyAuthToken;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(VerifyAuthToken::class)->group(function () {
-    Route::post('/customers', [CustomersController::class, 'create']);
+    Route::patch('/customers', [CustomersController::class, 'update']);
     Route::post('/customers/verify', [CustomersController::class, 'verify']);
 });

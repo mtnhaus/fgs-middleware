@@ -8,17 +8,14 @@ use App\Components\Shopify\Client\Graphql;
 use App\Components\Shopify\Client\Storefront;
 use App\Components\Shopify\Mutation\Admin\CustomerUpdate;
 use App\Components\Shopify\Mutation\Storefront\CustomerCreate;
+use App\Components\Shopify\Query\Admin\Customer;
 use App\Components\Shopify\Query\Admin\Customers;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 class ShopifyService
 {
-    public function __construct(
-        private Graphql $adminClient,
-        private Storefront $storefrontClient
-    ) {
-    }
+    public function __construct(private Graphql $adminClient) {}
 
     public function getCustomers(int $pageSize = 50, ?string $endCursor = null): array
     {
@@ -41,56 +38,51 @@ class ShopifyService
         return [$hasNextPage, $endCursor, $customers];
     }
 
-    public function createCustomer(array $data): string
+    public function getCustomer(string $id): array
     {
-        $input = [
-            'firstName' => Arr::get($data, 'first_name'),
-            'lastName' => Arr::get($data, 'last_name'),
-            'email' => Arr::get($data, 'email'),
-            'password' => Arr::get($data, 'password'),
-        ];
-
         try {
-            $response = $this->storefrontClient->query(CustomerCreate::build($input));
+            $response = $this->adminClient->query(Customer::build($id));
         } catch (\Exception $e) {
-            Log::channel('shopify')->error('Failed to create customer in Shopify.', [
-                'input' => Arr::except($input, 'password'),
+            Log::channel('shopify')->error('Failed to fetch customer from Shopify.', [
                 'message' => $e->getMessage(),
             ]);
 
             throw $e;
         }
 
-        $customerId = (string) Arr::get($response->getDecodedBody(), 'data.customerCreate.customer.id');
-
-        $input = [
-            'id' => $customerId,
-            'metafields' => [
-                [
-                    'namespace' => 'customer',
-                    'key' => 'ghin_number',
-                    'value' => (string) Arr::get($data, 'ghin_number', ''),
-                ],
-                [
-                    'namespace' => 'customer',
-                    'key' => 'handicap_index',
-                    'value' => Arr::get($data, 'handicap_index', ''),
-                ],
-                [
-                    'namespace' => 'customer',
-                    'key' => 'tier',
-                    'value' => Arr::get($data, 'tier', ''),
-                ]
-            ],
-        ];
-
-        $this->updateCustomer($input);
-
-        return $customerId;
+        return Arr::get($response->getDecodedBody(), 'data.customer');
     }
 
-    public function updateCustomer(array $input): void
+    public function updateCustomer(array $customer, array $data = [], array $metafields = []): void
     {
+        $input = [
+            'id' => Arr::get($customer, 'id'),
+        ];
+
+        $input = array_merge($data, $input);
+
+        if ($metafields) {
+            $input['metafields'] = [];
+
+            foreach ($metafields as $key => $value) {
+                $value = (string) $value;
+                $id = Arr::get($customer, "{$key}.id");
+
+                if ($id) {
+                    $input['metafields'][] = [
+                        'id' => $id,
+                        'value' => $value,
+                    ];
+                } else {
+                    $input['metafields'][] = [
+                        'namespace' => 'customer',
+                        'key' => $key,
+                        'value' => $value,
+                    ];
+                }
+            }
+        }
+
         try {
             $this->adminClient->query(CustomerUpdate::build($input));
         } catch (\Exception $e) {

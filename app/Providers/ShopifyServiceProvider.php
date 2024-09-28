@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Components\Shopify\Client\Graphql;
-use App\Components\Shopify\Client\Storefront;
 use App\Services\ShopifyService;
 use Illuminate\Support\ServiceProvider;
 use Shopify\Auth\FileSessionStorage;
@@ -31,14 +30,8 @@ class ShopifyServiceProvider extends ServiceProvider
             config('shopify.api.access_token')
         ));
 
-        $this->app->singleton(Storefront::class, fn() => new Storefront(
-            config('shopify.domain'),
-            config('shopify.api.storefront_access_token')
-        ));
-
         $this->app->singleton(ShopifyService::class, fn() => new ShopifyService(
-            app(Graphql::class),
-            app(Storefront::class)
+            app(Graphql::class)
         ));
     }
 }

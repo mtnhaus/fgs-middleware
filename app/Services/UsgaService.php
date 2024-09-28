@@ -109,6 +109,7 @@ class UsgaService
     public function qualify(string $handicapIndex): string
     {
         return match (true) {
+            $handicapIndex === 'NH' => Tier::UNDEFINED->value,
             str_starts_with($handicapIndex, '+') => Tier::FT_PLUS->value,
             (float) $handicapIndex >= 0 && (float) $handicapIndex < 5 => Tier::FT1->value,
             (float) $handicapIndex >= 5 && (float) $handicapIndex < 10 => Tier::FT2->value,

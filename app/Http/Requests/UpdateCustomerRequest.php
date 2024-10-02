@@ -20,7 +20,7 @@ class UpdateCustomerRequest extends FormRequest
         return [
             'id' => ['required', 'string', 'regex:/^gid:\/\/shopify\/Customer\/\d+$/'],
             'ghin_number' => ['required', 'integer'],
-            'handicap_index' => ['required', 'string', 'regex:/^\+?\d+\.\d+$/'],
+            'handicap_index' => ['required', 'string', 'regex:/^(NH|\+?\d+\.\d+)$/'],
             'tier' => ['required', Rule::enum(Tier::class)],
         ];
     }

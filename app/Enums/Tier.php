@@ -6,7 +6,7 @@ namespace App\Enums;
 
 enum Tier: string
 {
-    case UNDEFINED = '';
+    case UNDEFINED = 'NH';
     case FT_PLUS = 'FT+';
     case FT1 = 'FT1';
     case FT2 = 'FT2';
